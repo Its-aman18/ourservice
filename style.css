@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Return Request</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+<h2>Return Request</h2>
+
+<input type="text" id="returnOrderId" placeholder="Order ID"><br><br>
+
+<select id="reason">
+    <option>Damaged Product</option>
+    <option>Wrong Item</option>
+    <option>Other</option>
+</select><br><br>
+
+<button onclick="submitReturn()">Submit</button>
+
+<p id="returnMsg"></p>
+</div>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+<h2>Admin Panel</h2>
+
+<input type="text" id="adminOrderId" placeholder="Order ID">
+<select id="newStatus">
+    <option>Placed</option>
+    <option>Shipped</option>
+    <option>Out for Delivery</option>
+    <option>Delivered</option>
+</select>
+
+<button onclick="updateStatus()">Update Status</button>
+
+<p id="adminMsg"></p>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
