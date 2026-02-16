@@ -1,61 +1,215 @@
-// Initialize Orders
-if (!localStorage.getItem("orders")) {
-    let initialOrders = {
-        "101": "Placed",
-        "102": "Shipped",
-        "103": "Delivered"
-    };
-    localStorage.setItem("orders", JSON.stringify(initialOrders));
-}
+/* =====================================================
+   SERVICE TAB SWITCHER
+===================================================== */
+function switchService(id) {
+    document.querySelectorAll(".service-panel")
+        .forEach(panel => panel.classList.remove("active"));
 
-function trackOrder() {
-    let id = document.getElementById("orderId").value;
-    let orders = JSON.parse(localStorage.getItem("orders"));
-    let status = orders[id];
+    document.querySelectorAll(".service-tab")
+        .forEach(tab => tab.classList.remove("active"));
 
-    let progressBar = document.getElementById("progressBar");
+    document.getElementById("panel-" + id)
+        .classList.add("active");
 
-    if (status) {
-        document.getElementById("status").innerText =
-            "Order Status: " + status;
+    document.getElementById("tab-" + id)
+        .classList.add("active");
 
-        let progress = {
-            "Placed": "25%",
-            "Shipped": "50%",
-            "Out for Delivery": "75%",
-            "Delivered": "100%"
-        };
-
-        progressBar.style.width = progress[status];
-    } else {
-        document.getElementById("status").innerText =
-            "Invalid Order ID";
-        progressBar.style.width = "0%";
+    if (id === "gps" && !mapInitialized) {
+        initMap();
     }
 }
 
-function submitReturn() {
-    let id = document.getElementById("returnOrderId").value;
-    let reason = document.getElementById("reason").value;
+/* =====================================================
+   LEAFLET MAP SECTION
+===================================================== */
+let map;
+let drawnItems;
+let drawControl;
+let mapInitialized = false;
 
-    let returns = JSON.parse(localStorage.getItem("returns")) || [];
-    returns.push({ orderId: id, reason: reason });
+function initMap() {
 
-    localStorage.setItem("returns", JSON.stringify(returns));
+    if (mapInitialized) return;
 
-    document.getElementById("returnMsg").innerText =
-        "Return Request Submitted!";
+    map = L.map("map").setView([28.9845, 77.7064], 12); // Meerut Default
+
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 19
+        }
+    ).addTo(map);
+
+    drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    map.on(L.Draw.Event.CREATED, function (e) {
+        drawnItems.addLayer(e.layer);
+        calculateArea(e.layer);
+    });
+
+    mapInitialized = true;
 }
 
-function updateStatus() {
-    let id = document.getElementById("adminOrderId").value;
-    let newStatus = document.getElementById("newStatus").value;
+/* =====================================================
+   LOCATION FUNCTIONS
+===================================================== */
+function getCurrentLocation() {
 
-    let orders = JSON.parse(localStorage.getItem("orders"));
+    if (!navigator.geolocation) {
+        alert("Geolocation not supported");
+        return;
+    }
 
-    orders[id] = newStatus;
-    localStorage.setItem("orders", JSON.stringify(orders));
+    navigator.geolocation.getCurrentPosition(position => {
 
-    document.getElementById("adminMsg").innerText =
-        "Status Updated Successfully!";
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        map.setView([lat, lng], 16);
+
+        L.marker([lat, lng]).addTo(map)
+            .bindPopup("Your Location")
+            .openPopup();
+
+    });
 }
+
+async function searchLocation() {
+
+    const query = document.getElementById("searchLocation").value;
+
+    if (!query) return;
+
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+        );
+
+        const data = await response.json();
+
+        if (data.length > 0) {
+
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+
+            map.setView([lat, lon], 15);
+
+            L.marker([lat, lon])
+                .addTo(map)
+                .bindPopup(data[0].display_name)
+                .openPopup();
+        }
+
+    } catch (error) {
+        alert("Location search failed");
+    }
+}
+
+/* =====================================================
+   DRAWING & AREA CALCULATION
+===================================================== */
+function startDrawing() {
+
+    if (drawControl) {
+        map.removeControl(drawControl);
+    }
+
+    drawControl = new L.Control.Draw({
+        draw: {
+            polygon: true,
+            polyline: false,
+            rectangle: false,
+            circle: false,
+            marker: false,
+            circlemarker: false
+        },
+        edit: {
+            featureGroup: drawnItems
+        }
+    });
+
+    map.addControl(drawControl);
+}
+
+function calculateArea(layer) {
+
+    const latlngs = layer.getLatLngs()[0];
+
+    const coordinates = latlngs.map(ll => [ll.lng, ll.lat]);
+    coordinates.push(coordinates[0]);
+
+    const polygon = turf.polygon([coordinates]);
+
+    const area = turf.area(polygon);
+    const perimeter = turf.length(polygon, { units: "kilometers" }) * 1000;
+
+    document.getElementById("areaSqM").textContent =
+        area.toFixed(2);
+
+    document.getElementById("areaAcre").textContent =
+        (area / 4046.86).toFixed(4);
+
+    document.getElementById("perimeter").textContent =
+        perimeter.toFixed(2);
+
+    document.getElementById("resultCard")
+        .classList.add("show");
+}
+
+function clearAll() {
+    drawnItems.clearLayers();
+    document.getElementById("resultCard")
+        .classList.remove("show");
+}
+
+/* =====================================================
+   FERTILIZER CALCULATOR
+===================================================== */
+function calculateFertilizer() {
+
+    const crop = document.getElementById("crop").value;
+    const acres = parseFloat(
+        document.getElementById("acres").value
+    );
+
+    if (!crop || !acres || acres <= 0) {
+        alert("Please enter valid data");
+        return;
+    }
+
+    const fertilizerData = {
+        Wheat: { urea: 260, dap: 130 },
+        Rice: { urea: 220, dap: 110 },
+        Cotton: { urea: 325, dap: 130 },
+        Sugarcane: { urea: 435, dap: 175 }
+    };
+
+    const data = fertilizerData[crop];
+
+    const totalUrea = (data.urea * acres).toFixed(2);
+    const totalDAP = (data.dap * acres).toFixed(2);
+
+    const resultBox =
+        document.getElementById("fertilizerResult");
+
+    resultBox.innerHTML = `
+        <div class="result-item">
+            <span>Urea Required</span>
+            <span>${totalUrea} kg</span>
+        </div>
+        <div class="result-item">
+            <span>DAP Required</span>
+            <span>${totalDAP} kg</span>
+        </div>
+    `;
+
+    resultBox.classList.add("show");
+}
+
+/* =====================================================
+   INITIALIZE ON LOAD
+===================================================== */
+window.onload = function () {
+    initMap();
+};
