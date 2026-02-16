@@ -213,3 +213,4 @@ function calculateFertilizer() {
 window.onload = function () {
     initMap();
 };
+
